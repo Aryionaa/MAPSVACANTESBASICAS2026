@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Vacantes — Benito Juárez</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --font-display: Georgia, 'Times New Roman', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Courier New', ui-monospace, monospace;
+    --ink:#12151c;
+    --ink-2:#1b1f29;
+    --ink-3:#232838;
+    --paper:#ede7da;
+    --paper-dim:#a9a495;
+    --maroon:#8a2f3d;
+    --maroon-bright:#c5495a;
+    --gold:#c9a26b;
+    --line: rgba(237,231,218,0.14);
+    --line-strong: rgba(237,231,218,0.28);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--ink);
+    color:var(--paper);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--maroon); color:var(--paper); }
+
+  .masthead{
+    padding:28px 24px 20px;
+    border-bottom:2px solid var(--line-strong);
+    background:
+      radial-gradient(1000px 300px at 10% -30%, rgba(138,47,61,0.28), transparent 60%),
+      var(--ink);
+  }
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--gold);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .eyebrow::before{ content:""; width:20px; height:1px; background:var(--gold); display:inline-block; }
+  h1{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:clamp(24px, 3.4vw, 34px);
+    line-height:1.05;
+    letter-spacing:-0.01em;
+    margin:0 0 6px;
+  }
+  h1 em{ font-style:italic; font-weight:400; color:var(--maroon-bright); }
+  .sub{ font-size:13.5px; color:var(--paper-dim); max-width:70ch; line-height:1.5; margin:0; }
+
+  .app{
+    display:grid;
+    grid-template-columns: 400px 1fr;
+    height:calc(100vh - 122px);
+    min-height:520px;
+  }
+
+  .panel{
+    border-right:1px solid var(--line-strong);
+    display:flex;
+    flex-direction:column;
+    background:var(--ink);
+    min-height:0;
+  }
+
+  .controls{
+    padding:16px 18px 12px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .chips{ display:flex; gap:8px; flex-wrap:wrap; }
+  .chip{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    padding:7px 12px;
+    border:1px solid var(--line-strong);
+    border-radius:999px;
+    background:transparent;
+    color:var(--paper-dim);
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .chip:hover{ color:var(--paper); border-color:var(--paper-dim); }
+  .chip.active{ background:var(--maroon); border-color:var(--maroon); color:var(--paper); }
+  .search input{
+    width:100%;
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    color:var(--paper);
+    font-family:var(--font-body);
+    font-size:13.5px;
+    padding:9px 12px;
+    border-radius:8px;
+    outline:none;
+  }
+  .search input:focus{ border-color:var(--gold); }
+  .search input::placeholder{ color:var(--paper-dim); }
+  .count{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--paper-dim);
+  }
+  .count b{ color:var(--gold); }
+
+  .list{
+    overflow-y:auto;
+    flex:1;
+    min-height:0;
+  }
+  .group-title{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--maroon-bright);
+    padding:14px 18px 6px;
+    position:sticky;
+    top:0;
+    background:var(--ink);
+    z-index:2;
+  }
+  .row{
+    display:block;
+    padding:12px 18px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    transition:background .12s ease;
+  }
+  .row:hover{ background:var(--ink-2); }
+  .row.selected{ background:var(--ink-3); border-left:2px solid var(--maroon-bright); padding-left:16px; }
+  .name{
+    font-family:var(--font-display);
+    font-size:15px;
+    font-weight:500;
+    line-height:1.25;
+    margin-bottom:5px;
+  }
+  .row-meta{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .turnos{ display:flex; gap:6px; flex-wrap:wrap; }
+  .badge{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.03em;
+    padding:3px 8px;
+    border-radius:999px;
+    border:1px solid var(--line-strong);
+    white-space:nowrap;
+  }
+  .badge.mat{ border-color:rgba(201,162,107,0.5); color:var(--gold); }
+  .badge.ves{ border-color:rgba(197,73,90,0.5); color:var(--maroon-bright); }
+  .maplink{
+    font-family:var(--font-mono);
+    font-size:10px;
+    color:var(--paper-dim);
+    text-decoration:none;
+    border-bottom:1px dotted var(--paper-dim);
+  }
+  .maplink:hover{ color:var(--gold); border-color:var(--gold); }
+
+  #map{ width:100%; height:100%; background:var(--ink-2); }
+  #map .leaflet-tile-pane{
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.7);
+  }
+  #mapFallback{
+    display:none;
+    width:100%; height:100%;
+    align-items:center; justify-content:center;
+    text-align:center;
+    color:var(--paper-dim);
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:24px;
+    line-height:1.7;
+  }
+  #mapFallback a{ color:var(--gold); }
+
+  .leaflet-popup-content-wrapper{
+    background:var(--ink-3);
+    color:var(--paper);
+    border-radius:10px;
+    border:1px solid var(--line-strong);
+  }
+  .leaflet-popup-tip{ background:var(--ink-3); }
+  .leaflet-popup-content{ font-family:var(--font-body); margin:12px 14px; }
+  .popup-name{ font-family:var(--font-display); font-size:15px; font-weight:600; margin-bottom:6px; }
+  .popup-meta{ font-family:var(--font-mono); font-size:10.5px; color:var(--paper-dim); margin-bottom:8px; }
+  .popup-badges{ display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .popup-link{ font-family:var(--font-mono); font-size:11px; color:var(--gold); text-decoration:none; }
+  .popup-link:hover{ text-decoration:underline; }
+
+  .leaflet-control-attribution{ background:rgba(18,21,28,0.8) !important; color:var(--paper-dim) !important; }
+  .leaflet-control-attribution a{ color:var(--gold) !important; }
+  .leaflet-control-zoom a{ background:var(--ink-2) !important; color:var(--paper) !important; border-color:var(--line-strong) !important; }
+
+  .empty{ padding:40px 18px; color:var(--paper-dim); font-family:var(--font-mono); font-size:12px; text-align:center; }
+
+  footer{
+    padding:10px 24px;
+    color:var(--paper-dim);
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    border-top:1px solid var(--line);
+  }
+
+  @media (max-width:820px){
+    .app{ grid-template-columns: 1fr; grid-template-rows: 42vh 1fr; height:auto; }
+    .panel{ border-right:none; border-bottom:1px solid var(--line-strong); order:2; }
+    #map{ order:1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="eyebrow">Servicios Educativos de Quintana Roo · Dirección de Carrera Docente</div>
+  <h1>Mapa de vacantes de <em>readscripción</em> — Benito Juárez</h1>
+  <p class="sub">Chetumal, Quintana Roo · 07 de julio de 2026. Selecciona una escuela en la lista o toca un marcador en el mapa.</p>
+</div>
+
+<div class="app">
+  <div class="panel">
+    <div class="controls">
+      <div class="chips" id="turnoChips">
+        <button class="chip active" data-turno="all">Todos</button>
+        <button class="chip" data-turno="Matutino">Matutino</button>
+        <button class="chip" data-turno="Vespertino">Vespertino</button>
+      </div>
+      <div class="search"><input type="text" id="searchInput" placeholder="Buscar por nombre…"></div>
+      <div class="count">Mostrando <b id="shownCount">0</b> de <b id="totalCount">0</b> escuelas</div>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+  <div id="map"></div>
+  <div id="mapFallback">
+    El mapa no pudo cargar (sin conexión al proveedor de mapas).<br>
+    Usa el botón <b>"Google Maps"</b> junto a cada escuela en la lista para ver su ubicación.
+  </div>
+</div>
+
+<footer>
+  Fuente: Departamento de Admisión, SEQ · 4 escuelas (Nahil-Xooc, El Pípila, Juan Sabines Gutiérrez, Ermilio Abreu Gómez) no tienen ubicación verificada en Maps y no aparecen aquí.
+</footer>
+
+<script>
+const schools = [
+  {name:"Otilio Montaño", loc:"Cancún", lat:21.11027, lng:-86.9457365, pid:"ChIJA2c5u6vVTY8RjMmJ1d3PZJM", turnos:[["Matutino",1],["Vespertino",3]]},
+  {name:"María del Rosario Cáceres Ortiz", loc:"Cancún", lat:21.1294851, lng:-86.9293468, pid:"ChIJw-wfATvVTY8RioszcEq-SHk", turnos:[["Vespertino",10]]},
+  {name:"Antonio Rosales", loc:"Cancún", lat:21.1732374, lng:-86.8408613, pid:"ChIJW2yhs5ctTI8Rs0CZE_OPw50", turnos:[["Matutino",1]]},
+  {name:"Independencia", loc:"Cancún", lat:21.1086113, lng:-86.9359231, pid:"ChIJW8U5QgDVTY8RhsH9hRITc4A", turnos:[["Matutino",7],["Vespertino",2]]},
+  {name:"Ek Balam", loc:"Cancún", lat:21.2004721, lng:-86.8537017, pid:"ChIJ14A4lvstTI8RU8pTJrPMY84", turnos:[["Vespertino",1]]},
+  {name:"Sentimientos de la Nación", loc:"Cancún", lat:21.1487934, lng:-86.9146522, pid:"ChIJGQk417rUTY8RHoFWSg2drRQ", turnos:[["Vespertino",11]]},
+  {name:"Francisco Hoil Torres", loc:"Cancún", lat:21.1804164, lng:-86.9122333, pid:"ChIJp-EDMR7TTY8RW2GN0vrwWM8", turnos:[["Vespertino",5]]},
+  {name:"Eduardo Enrique Méndez Palma", loc:"Cancún", lat:21.1603078, lng:-86.9332193, pid:"ChIJkcMOL_3VTY8RLkb_eATGX0U", turnos:[["Vespertino",5]]},
+  {name:"Gualberto Salazar Centeno", loc:"Cancún", lat:21.1646733, lng:-86.9168333, pid:"ChIJL3SsQFnTTY8RlBVDx_4Cfb0", turnos:[["Vespertino",1]]},
+  {name:"Lauro Aguirre Espinoza", loc:"Cancún", lat:21.0945094, lng:-86.946368, pid:"ChIJhXBgFaHVTY8RrEeMlwYZZo4", turnos:[["Matutino",9],["Vespertino",2]]},
+  {name:"Melchor Ocampo", loc:"Cancún", lat:21.1872698, lng:-86.8080438, pid:"ChIJQ4bTlpYuTI8RDeuFwU3D2mQ", turnos:[["Matutino",2]]},
+  {name:"Río Hondo", loc:"Cancún", lat:21.1065549, lng:-86.9184454, pid:"ChIJTaht6SPVTY8RIWBKdTlgyyU", turnos:[["Matutino",2],["Vespertino",1]]},
+  {name:"Nachi Cocom", loc:"Cancún", lat:21.1824109, lng:-86.8146578, pid:"ChIJJxWpYqIuTI8ROFaRjQ1o29c", turnos:[["Matutino",6]]},
+  {name:"Cuna del Mestizaje", loc:"Cancún", lat:21.1157783, lng:-86.9126799, pid:"ChIJsYcTL9jUTY8RlekGHObR9Sc", turnos:[["Matutino",6]]},
+  {name:"Mi Patria es Primero", loc:"Cancún", lat:21.108233, lng:-86.9332105, pid:"ChIJV65WIXPVTY8RGs8cDuLRRWE", turnos:[["Matutino",3],["Vespertino",1]]},
+  {name:"Tenochtitlán", loc:"Cancún", lat:21.1164035, lng:-86.9572101, pid:"ChIJnRGjhEzUTY8RGakXpmXTbwY", turnos:[["Matutino",4]]},
+  {name:"José Mariano Abasolo", loc:"Cancún", lat:21.0768296, lng:-87.0019294, pid:"ChIJm4BwP2XXTY8RO88YSrxXSQM", turnos:[["Matutino",3]]},
+  {name:"Felipe Ángeles", loc:"Cancún", lat:21.1735357, lng:-86.9074827, pid:"ChIJNfn_GA3TTY8R0g8BLTEPUzQ", turnos:[["Matutino",9],["Vespertino",6]]},
+  {name:"Bakhalal", loc:"Cancún", lat:21.1374577, lng:-86.9209384, pid:"ChIJU19fdcDUTY8RZ8MNEVdIQq4", turnos:[["Vespertino",2]]},
+  {name:"José Luis López Gil", loc:"Cancún", lat:21.1930711, lng:-86.8761974, pid:"ChIJe3RoGhEtTI8RQszhahNuMBI", turnos:[["Matutino",1]]},
+  {name:"9 de Enero de 1975", loc:"Cancún", lat:21.1531155, lng:-86.9221038, pid:"ChIJZ7ZPd6LUTY8RsyM7wtDShlE", turnos:[["Vespertino",7],["Matutino",1]]},
+  {name:"Narciso Mendoza", loc:"Cancún", lat:21.1886564, lng:-86.8217382, pid:"ChIJdYYrPQAvTI8RkYAp01kooCg", turnos:[["Matutino",3]]},
+  {name:"José Vasconcelos", loc:"Cancún", lat:21.2021927, lng:-86.8494979, pid:"ChIJvfr2LEwsTI8RwFKti2dC1pE", turnos:[["Vespertino",3],["Matutino",1]]},
+  {name:"Chetumal", loc:"Cancún", lat:21.1851728, lng:-86.8620773, pid:"ChIJiSa2WPUsTI8RhOfkQL2fwVc", turnos:[["Vespertino",1]]},
+  {name:"Efraín Santana Sánchez", loc:"Cancún", lat:21.1887839, lng:-86.85641, pid:"ChIJR1yFGlwsTI8RajDPGUQUxmo", turnos:[["Vespertino",1]]},
+  {name:"Jaime Sabines", loc:"Cancún", lat:21.1828584, lng:-86.8820523, pid:"ChIJa-_14r8sTI8RtefV-1VJTw0", turnos:[["Vespertino",1]]},
+  {name:"Guerra de Castas", loc:"Cancún", lat:21.177037, lng:-86.9084531, pid:"ChIJHcQP-k7TTY8RMdiuPCs9Bng", turnos:[["Matutino",5],["Vespertino",1]]},
+  {name:"Gonzalo Guerrero", loc:"Cancún", lat:21.1863363, lng:-86.8361484, pid:"ChIJC5qdzD0sTI8RhWvGpUB7t7E", turnos:[["Vespertino",2]]},
+  {name:"La Corregidora", loc:"Cancún", lat:21.177822, lng:-86.859138, pid:"ChIJQXSAXfstTI8RqWrjhMUjP9I", turnos:[["Vespertino",2]]},
+  {name:"Cielo Nuevo (Nueva Creación)", loc:"Cancún", lat:21.180825, lng:-86.9112647, pid:"ChIJ0UTqcZfTTY8R7Ku1i6eB-1E", turnos:[["Matutino",2]]},
+  {name:"Oxtankah", loc:"Cancún", lat:21.1433656, lng:-86.9086053, pid:"ChIJ4031SbHUTY8RxtW2FG2E7_4", turnos:[["Vespertino",1]]},
+  {name:"José Cilia Tescum", loc:"Cancún", lat:21.1339236, lng:-86.9255899, pid:"ChIJi9RSyXErTI8Rlb_avayjW_s", turnos:[["Vespertino",5]]},
+  {name:"Miguel León Portilla", loc:"Cancún", lat:21.1722257, lng:-86.9179294, pid:"ChIJ_THvKADTTY8RwMXSJxgNqfs", turnos:[["Matutino",1]]},
+  {name:"Ramón Bravo Prieto", loc:"Cancún", lat:21.1865119, lng:-86.8419217, pid:"ChIJp-cphCr_VRER7XOh1No0JzM", turnos:[["Matutino",1]]},
+  {name:"Diego Rivera", loc:"Cancún", lat:21.1945083, lng:-86.8328451, pid:"ChIJkbEuuzosTI8RuffnNmEb47g", turnos:[["Vespertino",1]]},
+  {name:"8 de Octubre de 1974", loc:"Cancún", lat:21.2063909, lng:-86.8768395, pid:"ChIJx-apI-IsTI8RY73LIc3FpH4", turnos:[["Vespertino",2]]},
+  {name:"Pablo Latapi Sarre", loc:"Cancún", lat:21.1460344, lng:-86.9133386, pid:"ChIJrxJLWKbUTY8RzD2dpvBfaRk", turnos:[["Vespertino",2]]},
+  {name:"Tulum", loc:"Cancún", lat:21.1323317, lng:-86.9232549, pid:"ChIJUWGJOlPVTY8RM_V9AUhV7EM", turnos:[["Vespertino",6]]},
+  {name:"Matilde Montoya", loc:"Cancún", lat:21.1722848, lng:-86.9172794, pid:"ChIJzQkV0CHTTY8RhsWDd2ir5q4", turnos:[["Vespertino",8]]},
+  {name:"Isla Holbox", loc:"Cancún", lat:21.1962077, lng:-86.8607717, pid:"ChIJpwqCi1csTI8RljWib5Fa6XQ", turnos:[["Vespertino",1]]},
+  {name:"Justo Sierra Méndez", loc:"Cancún", lat:21.1732527, lng:-86.8407633, pid:"ChIJk5zi6hIsTI8RR3jAmVSSnyM", turnos:[["Vespertino",3]]},
+  {name:"Amira Ávila Cervantes", loc:"Cancún", lat:21.1921365, lng:-86.8498845, pid:"ChIJE1kS-kQsTI8RFHZ6Iz8c_Is", turnos:[["Matutino",1]]},
+  {name:"Mario Pantoja Méndez", loc:"Cancún", lat:21.1795634, lng:-86.8676153, pid:"ChIJGQ3VcowsTI8RGau8rtUzzKM", turnos:[["Matutino",2]]},
+  {name:"Chilam Balam", loc:"Cancún", lat:21.168271, lng:-86.8806725, pid:"ChIJ8YE6V6UtTI8RuOnr6EA1j08", turnos:[["Vespertino",2]]},
+  {name:"Ejército Mexicano", loc:"Cancún", lat:21.1623296, lng:-86.8643292, pid:"ChIJx8fiW4AsTI8RtXAypvpWPSA", turnos:[["Matutino",1]]},
+  {name:"José Ma. Morelos y Pavón", loc:"Cancún", lat:21.1736994, lng:-86.8290252, pid:"ChIJcTqsGhssTI8Rmsat21rqFpo", turnos:[["Matutino",4]]},
+  {name:"Pedro Balado Alonzo", loc:"Cancún", lat:21.1989731, lng:-86.8312165, pid:"ChIJk0isOy4sTI8RkWFyeJUjE1U", turnos:[["Vespertino",1]]},
+  {name:"24 de Noviembre de 1902", loc:"Cancún", lat:21.1764954, lng:-86.8991702, pid:"ChIJo2BTpbMsTI8RBhC2pOf7x3s", turnos:[["Vespertino",1]]},
+  {name:"Luis Fernando Cervera Cortés", loc:"Cancún", lat:21.1532923, lng:-86.9128776, pid:"ChIJN1Lii6XUTY8RnTPH6YOn9lU", turnos:[["Matutino",1]]},
+  {name:"Naciones Unidas", loc:"Cancún", lat:21.1765664, lng:-86.8161681, pid:"ChIJaTzkDaQuTI8RKvCkTDL2STQ", turnos:[["Matutino",3]]},
+  {name:"José Clemente Orozco", loc:"Cancún", lat:21.1625134, lng:-86.9275554, pid:"ChIJH5GaHmLTTY8R2-mtr5ag8sc", turnos:[["Matutino",1]]},
+  {name:"Heroico Colegio Militar", loc:"Cancún", lat:21.1533764, lng:-86.9268372, pid:"ChIJB6nrTcfVTY8RNEB5UkvQciE", turnos:[["Vespertino",8]]},
+  {name:"Emiliano Zapata", loc:"Alfredo V. Bonfil", lat:21.0893743, lng:-86.8466238, pid:"ChIJoVKoBGsqTI8RfdjS4rH5IjM", turnos:[["Vespertino",6],["Matutino",1]]},
+  {name:"Octavio Paz", loc:"Alfredo V. Bonfil", lat:21.0884246, lng:-86.8542723, pid:"ChIJBRfs-WcqTI8RpI-BbNjw2rI", turnos:[["Matutino",1],["Vespertino",3]]},
+];
+
+function mapsUrl(s){ return `https://www.google.com/maps/place/?q=place_id:${s.pid}`; }
+function notesText(s){ return s.turnos.map(t=>`${t[0]}: ${t[1]} vacante${t[1]!==1?'s':''}`).join(' · '); }
+
+let map = null;
+let markers = {};
+let mapReady = false;
+
+function initMap(){
+  try{
+    if(typeof L === 'undefined') throw new Error('Leaflet no cargó');
+
+    map = L.map('map', { zoomControl:true }).setView([21.16, -86.88], 11);
+
+    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      subdomains: 'abc',
+      maxZoom: 19
+    });
+
+    let tileFailed = false;
+    tileLayer.on('tileerror', ()=>{ tileFailed = true; });
+    tileLayer.addTo(map);
+
+    const dotIcon = (color) => L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #12151c;box-shadow:0 0 0 2px ${color}55;"></div>`,
+      iconSize:[14,14],
+      iconAnchor:[7,7]
+    });
+
+    schools.forEach((s,i)=>{
+      const primaryTurno = s.turnos[0][0];
+      const color = primaryTurno === "Matutino" ? "#c9a26b" : "#c5495a";
+      const m = L.marker([s.lat, s.lng], {icon: dotIcon(color)}).addTo(map);
+      m.bindPopup(`
+        <div class="popup-name">${s.name}</div>
+        <div class="popup-meta">${s.loc} · Benito Juárez</div>
+        <div class="popup-badges">${s.turnos.map(t=>`<span class="badge ${t[0]==='Matutino'?'mat':'ves'}">${t[0]}: ${t[1]}</span>`).join('')}</div>
+        <a class="popup-link" href="${mapsUrl(s)}" target="_blank" rel="noopener">Abrir en Google Maps →</a>
+      `);
+      markers[i] = m;
+    });
+
+    mapReady = true;
+
+    setTimeout(()=>{
+      if(tileFailed){
+        document.getElementById('map').style.display = 'none';
+        document.getElementById('mapFallback').style.display = 'flex';
+        mapReady = false;
+      }
+    }, 4000);
+
+  }catch(err){
+    console.error('Map init failed:', err);
+    document.getElementById('map').style.display = 'none';
+    document.getElementById('mapFallback').style.display = 'flex';
+    mapReady = false;
+  }
+}
+
+initMap();
+
+let state = { turno:"all", search:"", selected:null };
+
+function passesFilter(s){
+  if(state.turno!=="all" && !s.turnos.some(t=>t[0]===state.turno)) return false;
+  if(state.search && !s.name.toLowerCase().includes(state.search.toLowerCase())) return false;
+  return true;
+}
+
+function renderList(){
+  const listEl = document.getElementById('list');
+  const filtered = schools.map((s,i)=>({s,i})).filter(o=>passesFilter(o.s));
+
+  document.getElementById('totalCount').textContent = schools.length;
+  document.getElementById('shownCount').textContent = filtered.length;
+
+  if(mapReady && map){
+    Object.values(markers).forEach(m=>map.removeLayer(m));
+    filtered.forEach(o=>markers[o.i].addTo(map));
+  }
+
+  if(filtered.length===0){
+    listEl.innerHTML = `<div class="empty">Sin resultados para estos filtros.</div>`;
+    return;
+  }
+
+  const groups = {};
+  filtered.forEach(o=>{ (groups[o.s.loc]=groups[o.s.loc]||[]).push(o); });
+
+  let html = "";
+  Object.keys(groups).sort().forEach(loc=>{
+    html += `<div class="group-title">${loc} · ${groups[loc].length}</div>`;
+    groups[loc].forEach(o=>{
+      const s = o.s;
+      html += `
+        <div class="row ${state.selected===o.i?'selected':''}" data-idx="${o.i}">
+          <div class="name">${s.name}</div>
+          <div class="row-meta">
+            <div class="turnos">${s.turnos.map(t=>`<span class="badge ${t[0]==='Matutino'?'mat':'ves'}">${t[0]}: ${t[1]}</span>`).join('')}</div>
+            <a class="maplink" href="${mapsUrl(s)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Google Maps</a>
+          </div>
+        </div>`;
+    });
+  });
+  listEl.innerHTML = html;
+
+  listEl.querySelectorAll('.row').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const idx = parseInt(row.dataset.idx);
+      selectSchool(idx);
+    });
+  });
+}
+
+function selectSchool(idx){
+  state.selected = idx;
+  const s = schools[idx];
+  if(mapReady && map){
+    map.flyTo([s.lat, s.lng], 15, {duration:0.6});
+    markers[idx].openPopup();
+  }
+  renderList();
+}
+
+document.getElementById('turnoChips').addEventListener('click', e=>{
+  const btn = e.target.closest('.chip');
+  if(!btn) return;
+  document.querySelectorAll('#turnoChips .chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  state.turno = btn.dataset.turno;
+  renderList();
+});
+
+document.getElementById('searchInput').addEventListener('input', e=>{
+  state.search = e.target.value;
+  renderList();
+});
+
+renderList();
+</script>
+
+</body>
+</html>
